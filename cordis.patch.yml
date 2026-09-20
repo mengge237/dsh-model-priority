@@ -1,0 +1,20 @@
+# ============================================================================
+# dsh-model-priority —— DSH bundle patch
+# ============================================================================
+# 把一个 webServer 插件插进 Web profile 的配置树：服务端注册两条自己的路由
+# （/dsh-model-priority/state.json 与 /order.json），浏览器侧注册成
+# dsh-better-sidebar 的一个侧边栏页面。
+#
+# 注意 patch 的形态：本地插件就是一条 insert，id 与 name 都等于包名。
+# （旧版这里写成 include: + patches: 去 patch 别的插件，那种写法插不进树。）
+#
+# 安装：
+#   dsh plugin --profile web add "E:/S_Software/deepseek-harness/plugins/dsh-model-priority"
+# 卸载：
+#   dsh plugin --profile web remove dsh-model-priority
+# 装完/改完要重启 dsh web 才加载（客户端那半个是启动时进 boot 图的 combo）。
+# ============================================================================
+
+- insert:
+    - id: dsh-model-priority
+      name: dsh-model-priority

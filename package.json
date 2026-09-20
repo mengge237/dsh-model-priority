@@ -1,0 +1,32 @@
+{
+  "name": "dsh-model-priority",
+  "version": "0.2.0",
+  "description": "自定义模型/提供方顺序：侧边栏拖拽排序，宿主的模型列表按这份顺序返回",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.2-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs"
+  },
+  "license": "MIT"
+}
