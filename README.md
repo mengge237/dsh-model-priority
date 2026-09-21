@@ -1,13 +1,14 @@
 # dsh-model-priority
 
 自定义模型 / 提供方的排列顺序。宿主的模型选择列表按适配器注册顺序排，常用的模型
-常常排在后面；这个插件让你在侧边栏里拖一下就把它顶到前面去。
+常常排在后面；这个插件让你在模型设置页里拖一下，把它顶到前面去。
 
 ## 长什么样
 
-右侧栏多一个「模型排序」页面（better-sidebar 的 tab，设置页「侧边卡片」里有对应开关）。
-页面上半是提供方列表，下半是选中提供方下面的模型列表，两边都能按住拖动。点「保存」
-写盘，点「恢复默认」清空顺序回到宿主原样。
+**设置 → 模型**页里，每张提供方卡片下面多一块「模型顺序」区（走上游槽位
+`settings.models.provider-card`，不用另开页面，也不需要装 dsh-better-sidebar）。
+默认折叠，展开后是分组后的模型列表，按住行拖动排序：点「保存」写盘，
+点「恢复默认」回到宿主原顺序。
 
 ## 它怎么生效
 
@@ -26,11 +27,18 @@
   - 形参个数跟原方法一致（远端按签名校验）：`listProviders()` 收 0 个，
     `listModels(provider)` 收 1 个。
   - 只重排，条目本身一个字段都不动。
-- 浏览器侧走本包自己的两条路由，不碰宿主的 Remote 通道：
+- 浏览器侧走本包自己的路由，不碰宿主的 Remote 通道（其余几条见下面「附带的轮换代理」）：
   - `GET /dsh-model-priority/state.json` —— 目录快照 + 当前顺序 + 挂钩状态
-  - `PUT /dsh-model-priority/order.json` —— 保存（`{"reset":true}` 清空）
+  - `GET /dsh-model-priority/provider-models?route=<route>` —— 某路由当前的模型 id 顺序
+  - `GET /dsh-model-priority/suggest?route=<route>&mode=capability|cheap|quota` —— 建议顺序
+  - `PUT /dsh-model-priority/order.json` —— 保存顺序文件（`{"reset":true}` 清空）
+  - `POST /dsh-model-priority/settings-order` —— 按给定顺序重排 `settings.yaml` 里该提供方的 `models`
 
-两条路由不走浏览器鉴权，所以不登 GUI 也能直接 curl 验。
+这些路由注册在 `ctx.webServer` 上，是**裸路由**：宿主的鉴权只覆盖 `client-connection`
+注册的通道与首页。所以本包自己判来源（Host 必须是 loopback 或宿主登记的权威、
+`sec-fetch-site` 不是 `cross-site`、有 `Origin` 时主机名要与 Host 一致），
+浏览器里任意站点的跨域请求一律 403，响应也不再带 `Access-Control-Allow-Origin`。
+本机 shell 里 `curl http://127.0.0.1:3080/dsh-model-priority/state.json` 照常能用。
 
 ## 它会动你的哪些文件
 
@@ -51,8 +59,9 @@ dsh plugin --profile web add "<本仓目录，或 git 地址>"
 dsh plugin --profile web remove dsh-model-priority
 ```
 
-「模型排序」这个页面挂在 **dsh-better-sidebar** 的侧边卡片位上（设置页「侧边卡片」里有开关），
-没装 better-sidebar 时页面不挂载，但下面那两条 HTTP 路由照常可用。
+面板挂在**上游**的 `settings.models.provider-card` 席位上（2026-09-10 改版时删掉了早期的
+侧边栏 tab），所以不需要装 dsh-better-sidebar：宿主有模型设置页就能用；
+拿不到 slots 服务时面板不挂载，那几条 HTTP 路由照常可用。
 
 装完要**重启 dsh web**：服务端半边（注册路由、挂钩）与浏览器侧半边（进 boot 图的 combo）
 都是启动时装配的，只有重启才生效。顺序文件是每次调用现读的，改它不用重启。
@@ -68,9 +77,10 @@ npm test
 - `test/selftest.mjs` —— 数据层：顺序文件的读写与清洗、稳定排序的边界
   （名单里有不存在的 id、缺 id、空名单、原数组不被就地改动）。
 - `test/server-routes.mjs` —— 服务端半边端到端：拿假 ctx（假 `webServer` + 假 `llm`）
-  把两条路由真跑一遍，验状态码、排序真的作用到 `listProviders` / `listModels` /
+  把八条路由真跑一遍，验状态码、排序真的作用到 `listProviders` / `listModels` /
   `listConfigurableProviders`、坏 body 回 400、不支持的方法回 405、
-  **同步契约**、以及重复 apply 不套第二层挂钩。
+  **同步契约**、重复 apply 不套第二层挂钩，以及信任栅栏的那五条
+  （跨站 403、DNS 重绑定 403、宿主登记的权威放行、响应不带跨域头、`proxy-status` 不含 token）。
 - `test/client-smoke.mjs` —— 浏览器侧半边：用假 `window.__ModuleLoader__` 与假 react
   把 bundle 跑一遍，验模块 id、只 require react、注册的描述符字段、icon 是内联 svg。
 
@@ -102,3 +112,5 @@ npm test
 - 路径里带一个 32 字节随机 token（存在 `~/.dsh/model-priority-proxy.json`），不知道 token 一律 403 ——
   插件路由不走浏览器鉴权，不设这道门等于本机任何进程都能拿你的密钥刷额度；
 - 想要的是「成熟的换 key / 故障转移」，建议先跟 `dsh-model-router` 那类插件比过再决定用哪个。
+- 状态口 `GET /dsh-model-priority/proxy-status` 只报密钥**数量**、冷却与配置文件位置，
+  不回显 token（要手工配 baseURL 就自己看 `~/.dsh/model-priority-proxy.json`）。

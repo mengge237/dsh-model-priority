@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-priority",
-  "version": "0.2.0",
-  "description": "自定义模型/提供方顺序：侧边栏拖拽排序，宿主的模型列表按这份顺序返回",
+  "version": "0.2.1",
+  "description": "自定义模型/提供方顺序：模型设置页里拖拽排序，宿主的模型列表按这份顺序返回",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

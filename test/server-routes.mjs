@@ -62,24 +62,28 @@ function makeCtx(llm) {
   }
 }
 
-// 把一个假的 req/res 喂给路由的 handler，拿回 { status, json }
-async function call(route, { method = 'GET', body } = {}) {
+// 把一个假的 req/res 喂给路由的 handler，拿回 { status, json, headers, raw }
+// 默认带「本机页面同源」的那几个头；测跨站 / DNS 重绑定就显式覆盖（headers: null = 一个头都不带）。
+async function call(route, { method = 'GET', body, headers, url } = {}) {
   const req = new Readable({ read() {} })
   req.method = method
-  req.url = route.path
+  req.url = url || route.path
+  req.headers = headers === null ? {} : Object.assign(
+    { host: '127.0.0.1:3080', 'sec-fetch-site': 'same-origin' }, headers || {})
   if (body !== undefined) req.push(typeof body === 'string' ? body : JSON.stringify(body))
   req.push(null)
 
   let status = 0
   let raw = ''
   const res = {
-    writeHead(code) { status = code; return this },
+    headers: null,
+    writeHead(code, h) { status = code; this.headers = h || null; return this },
     end(text) { if (text) raw += text; return this },
   }
   await route.handler(req, res)
   let json = null
   try { json = raw ? JSON.parse(raw) : null } catch { json = { __unparsable: raw } }
-  return { status, json }
+  return { status, json, headers: res.headers, raw }
 }
 
 /* ── 跑 ── */
@@ -348,6 +352,80 @@ await ok('页面新增的空 id 条目也参与排序且不丢（合成 id __unn
   const unnamedStillThere = after.split(String.fromCharCode(10)).some((l) => l.trim() === '- id:')
   assert.ok(unnamedStillThere, '空 id 条目必须仍在')
   assert.ok(after.indexOf('name: Beta') >= 0 && after.indexOf('name: Alpha') >= 0, '字段不能丢')
+})
+
+
+/* ── 浏览器信任栅栏（2026-09-21 加）────────────────────────────────────────── */
+
+const proxyMod = await import('../lib/proxy.js')
+const CROSS = { host: '127.0.0.1:3080', origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' }
+
+await ok('响应里不再有 Access-Control-Allow-Origin', async () => {
+  for (const path of [STATE, ORDER]) {
+    const got = await call(ctx.routes.get(path))
+    assert.equal(got.status, 200, path)
+    assert.ok(got.headers, path + ' 应该有响应头')
+    assert.equal(got.headers['Access-Control-Allow-Origin'], undefined, path + ' 不该再带跨域头')
+    assert.equal(got.headers['access-control-allow-origin'], undefined, path + ' 不该再带跨域头')
+  }
+})
+
+await ok('跨站请求（sec-fetch-site: cross-site + 外部 Origin）一律 403', async () => {
+  const cases = [
+    [STATE, { method: 'GET' }],
+    [ORDER, { method: 'PUT', body: { providerOrder: ['p1'] } }],
+    ['/dsh-model-priority/provider-models', { method: 'GET' }],
+    ['/dsh-model-priority/suggest', { method: 'GET' }],
+    ['/dsh-model-priority/settings-order', { method: 'POST', body: { route: 'demo', ids: [] } }],
+    ['/dsh-model-priority/proxy-status', { method: 'GET' }],
+    ['/dsh-model-priority/proxy-enable', { method: 'POST', body: { route: 'demo' } }],
+  ]
+  for (const [path, opts] of cases) {
+    const got = await call(ctx.routes.get(path), Object.assign({}, opts, { headers: CROSS }))
+    assert.equal(got.status, 403, path + ' 跨站应该 403，实际 ' + got.status)
+    assert.equal(got.json.ok, false, path)
+  }
+})
+
+await ok('DNS 重绑定（Host 不是 loopback）403；宿主登记的权威放行', async () => {
+  const rebound = await call(ctx.routes.get(STATE), { headers: { host: 'evil.example' } })
+  assert.equal(rebound.status, 403)
+  assert.equal((await call(ctx.routes.get(STATE), { headers: null })).status, 403, '连 Host 都没有也该拒')
+
+  const ctxHost = makeCtx(makeLlm())
+  ctxHost.get = (k) => (k === 'webRuntime' ? { trustedHosts: ['dsh.example:8443'] } : undefined)
+  mod.apply(ctxHost)
+  const listed = await call(ctxHost.routes.get(STATE), { headers: { host: 'dsh.example:8443' } })
+  assert.equal(listed.status, 200, '宿主自己登记的权威应当放行')
+  const listedWrongPort = await call(ctxHost.routes.get(STATE), { headers: { host: 'dsh.example:9999' } })
+  assert.equal(listedWrongPort.status, 403, '端口对不上的权威不放行')
+})
+
+await ok('Origin 与 Host 同一个主机名才放行（端口不同也放行，Edge 会漏端口）', async () => {
+  assert.equal((await call(ctx.routes.get(STATE), { headers: { origin: 'http://evil.example' } })).status, 403)
+  assert.equal((await call(ctx.routes.get(STATE), { headers: { origin: 'http://127.0.0.1:3080' } })).status, 200)
+  assert.equal((await call(ctx.routes.get(STATE), { headers: { host: 'localhost:3080', origin: 'http://localhost:3080' } })).status, 200)
+  assert.equal((await call(ctx.routes.get(STATE), { headers: { origin: 'null' } })).status, 403, 'sandboxed iframe 的 null 源要拒')
+})
+
+await ok('proxy-status 不回显 token，只给占位模板与配置文件位置', async () => {
+  const cfg = proxyMod.loadConfig()   // 没有配置文件时这一步会生成一份带 token 的
+  assert.ok(typeof cfg.token === 'string' && cfg.token.length >= 16, '配置文件里应该有 token')
+  const got = await call(ctx.routes.get('/dsh-model-priority/proxy-status'))
+  assert.equal(got.status, 200)
+  assert.equal(got.json.proxyBaseFor, undefined, '不该再逐 route 回显带 token 的 baseURL')
+  assert.ok(String(got.json.proxyBaseTemplate).includes('<token>'), '只给字面占位')
+  assert.ok(got.raw.indexOf(cfg.token) < 0, '响应体里不许出现真 token')
+  assert.ok(String(got.json.proxyFile).endsWith('model-priority-proxy.json'))
+})
+
+await ok('rotate 前缀不套这道闸，仍然只认路径里的 token', async () => {
+  const got = await call(ctx.routes.get('/dsh-model-priority/rotate'), {
+    method: 'POST', url: '/dsh-model-priority/rotate/wrong-token/demo/chat/completions',
+    body: '{}', headers: CROSS,
+  })
+  assert.equal(got.status, 403)
+  assert.ok(String(got.json.error).includes('token'), '403 该来自 token 校验而不是栅栏：' + got.raw)
 })
 
 console.log('\n' + passed + ' 项全过')
