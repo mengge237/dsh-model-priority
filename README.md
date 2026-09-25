@@ -32,7 +32,8 @@
   - `GET /dsh-model-priority/provider-models?route=<route>` —— 某路由当前的模型 id 顺序
   - `GET /dsh-model-priority/suggest?route=<route>&mode=capability|cheap|quota` —— 建议顺序
   - `PUT /dsh-model-priority/order.json` —— 保存顺序文件（`{"reset":true}` 清空）
-  - `POST /dsh-model-priority/settings-order` —— 按给定顺序重排 `settings.yaml` 里该提供方的 `models`
+  - `POST /dsh-model-priority/settings-order` —— 按给定顺序重排**当前生效真源**里该提供方的 `models`
+    （0.1.5 线是 `~/.dsh/settings.yaml`；0.1.7 线起是 profile 用户层 `~/.dsh/profiles/<p>/cordis.patch.yml`）
 
 这些路由注册在 `ctx.webServer` 上，是**裸路由**：宿主的鉴权只覆盖 `client-connection`
 注册的通道与首页。所以本包自己判来源（Host 必须是 loopback 或宿主登记的权威、
@@ -45,12 +46,14 @@
 | 文件 | 什么时候 | 怎么收拾 |
 |---|---|---|
 | `~/.dsh/model-order.json` | 每次点「保存」 | 删掉就回默认 |
-| `~/.dsh/settings.yaml` | 点「保存」并同步宿主时 | **写之前先备份成 `settings.yaml.bak-<时间戳>`**；只重排对应提供方 `models` 数组的顺序，其它键一个都不动 |
+| `~/.dsh/settings.yaml`（0.1.5 线） | 点「保存」并同步宿主时 | **写之前先备份成 `settings.yaml.bak-<时间戳>`**；只重排对应提供方 `models` 数组的顺序，其它键一个都不动 |
+| `~/.dsh/profiles/<p>/cordis.patch.yml`（0.1.7 线起的真源） | 同上 | **写之前先备份成 `cordis.patch.yml.bak-<时间戳>`**；只动对应提供方 `models` 的那几行，块外逐行必须一字不变。落盘前后各做一次校验：条目集合未增删、总行数不变、区域外逐行一致、重读一遍顺序符合要求 —— 任一道不过就整次拒绝、一个字节都不写 |
 | `~/.dsh/model-priority-proxy.json` | 只有启用下面那个轮换代理才会创建 | 删掉即停用 |
 
-为什么连 `settings.yaml` 也要写：宿主是拿 settings 里 `models` 数组的**顺序**来渲染模型列表的（设置页与选择器都看它）。
+为什么要写这份配置：宿主是拿 `models` 数组的**顺序**来渲染模型列表的（设置页与选择器都看它）。
 只在读的时候排序，会出现「设置页一个顺序、模型选择器另一个顺序」，两套顺序来源必然打架。所以写盘这一边是刻意的 ——
-也正因为如此，写之前必须备份。
+也正因为如此，写之前必须备份。0.1.7 把配置从 `settings.yaml` 搬进了 profile 用户层（老文件只留 `settings.yaml.imported`），
+本包两代形状都认：读到的提供方与模型顺序在两边完全一致，这一点有回归测试盯着（`test/settings-source.test.mjs`）。
 
 ## 装 / 卸
 
@@ -88,8 +91,8 @@ npm test
 
 - 只在 `ctx.llm` 真的暴露上述方法的宿主版本上生效；挂不上时 `state.json` 的
   `hook.ok` 会是 `false` 并带上原因，页面顶部会把原因显示出来，顺序文件仍然可编辑。
-- 不改宿主任何一行代码；但会按你的操作重排 `~/.dsh/settings.yaml` 里对应提供方的 `models` 数组（写前自动备份，见上）。卸载后 `model-order.json` 与代理配置留在 `~/.dsh` 下，手动删。
-- 靠改 `settings.yaml` 里 provider 的键顺序来排序**不可靠**：宿主的
+- 不改宿主任何一行代码；但会按你的操作重排**当前生效真源**里对应提供方的 `models` 数组（0.1.5 线是 `~/.dsh/settings.yaml`，0.1.7 线起是 `~/.dsh/profiles/<p>/cordis.patch.yml`；写前都自动备份，见上）。卸载后 `model-order.json` 与代理配置留在 `~/.dsh` 下，手动删。
+- 靠改配置里 provider 的**键顺序**来排序不可靠：宿主的
   `registrationFacts` 会对 provider 做 sort 来判断"是否变化"，单纯调键序不触发
   replace，运行中不会立刻生效，而且被 replace 的那批路由会被挪到 Map 末尾。
   要固定顺序就用这个插件。
