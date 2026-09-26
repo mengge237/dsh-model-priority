@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-priority",
-  "version": "0.2.3",
-  "description": "自定义模型/提供方顺序：模型设置页里拖拽排序，宿主的模型列表按这份顺序返回",
+  "version": "0.2.4",
+  "description": "自定义模型/提供方顺序：模型设置页里拖拽排序，宿主的模型列表按这份顺序返回（写回配置真源，备份去重且只留最近 N 份）",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -26,7 +26,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs && node --test test/settings-source.test.mjs && node --test test/client-failure-state.test.mjs"
+    "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs && node --test test/settings-source.test.mjs && node --test test/client-failure-state.test.mjs && node --test test/backup-policy.test.mjs"
   },
   "license": "MIT"
 }
