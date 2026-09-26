@@ -140,3 +140,18 @@ test('保存路径：来回拖四次只留两份备份（A 与 B 各一份）', 
   assert.equal(readFileSync(join(home, rel), 'utf8').includes('- id: m1\n          - id: m2\n          - id: m3'), true,
     '最终顺序要回到 m1,m2,m3')
 })
+
+test('同一毫秒内换两个不同状态（CI 上实测会撞）：备份名顺延 1ms，形状不变、两份都在', () => {
+  const d = tmp(); const f = join(d, 'cfg.yml')
+  writeFileSync(f, 'A\n', 'utf8')
+  const real = Date.now()
+  Date.now = () => real        // 冻住时钟，逼出同名
+  let r1, r2
+  try { r1 = B.writeWithBackup(f, 'B\n'); r2 = B.writeWithBackup(f, 'A\n') } finally { Date.now = real }
+  const kept = list(d, 'cfg.yml')
+  assert.equal(kept.length, 2, '两个写前状态各留一份，实际 ' + kept.length + '：' + kept.join(','))
+  assert.ok(kept.every((n) => new RegExp(String.raw`^cfg\.yml\.bak-${ISO}$`).test(n)),
+    '名字必须保持同一种形状（不许出现 -2 这类后缀）：' + kept.join(','))
+  assert.deepEqual(kept.map((n) => readFileSync(join(d, n), 'utf8')).sort(), ['A\n', 'B\n'])
+  assert.equal(readFileSync(f, 'utf8'), 'A\n')
+})
