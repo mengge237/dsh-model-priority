@@ -5,8 +5,8 @@
 
 ## 长什么样
 
-**设置 → 模型**页里，每张提供方卡片下面多一块「模型顺序」区（走上游槽位
-`settings.models.provider-card`，不用另开页面，也不需要装 dsh-better-sidebar）。
+**设置 → 模型**页里，你自己配置的提供方卡片下面多一块「模型顺序」区（走上游槽位
+`settings.models.provider-card`，不用另开页面，也不需要装 dsh-better-sidebar；席位按适配器家族各注册一次，覆盖 `llm-pi-ai` 与内置 `llm-deepseek` 两个家族）。
 默认折叠，展开后是分组后的模型列表，按住行拖动排序：点「保存」写盘，
 点「恢复默认」回到宿主原顺序。
 
@@ -75,7 +75,7 @@ dsh plugin --profile web remove dsh-model-priority
 npm test
 ```
 
-三个脚本，都不启动 dsh、不碰 3080 端口：
+五个脚本，合计 54 项，都不启动 dsh、不碰 3080 端口：
 
 - `test/selftest.mjs` —— 数据层：顺序文件的读写与清洗、稳定排序的边界
   （名单里有不存在的 id、缺 id、空名单、原数组不被就地改动）。
@@ -86,11 +86,17 @@ npm test
   （跨站 403、DNS 重绑定 403、宿主登记的权威放行、响应不带跨域头、`proxy-status` 不含 token）。
 - `test/client-smoke.mjs` —— 浏览器侧半边：用假 `window.__ModuleLoader__` 与假 react
   把 bundle 跑一遍，验模块 id、只 require react、注册的描述符字段、icon 是内联 svg。
+- `test/settings-source.test.mjs`（5 项）—— 配置真源：0.1.5 的 `settings.yaml` 与 0.1.7 的 profile 用户层
+  `cordis.patch.yml` 两代形状解析结果必须一致；写回只动 `models` 块、块外逐行不变、找不到提供方就一个字节不落。
+- `test/client-failure-state.test.mjs`（3 项）—— 读侧失败态：`provider-models` 被拒或回 `ok:false` 时，
+  卡片标题必须落回「读取失败」（0.2.2 之前会永远停在「读取中…」，因为错误正文只在展开后才渲染）。
 
 ## 边界
 
 - 只在 `ctx.llm` 真的暴露上述方法的宿主版本上生效；挂不上时 `state.json` 的
   `hook.ok` 会是 `false` 并带上原因，页面顶部会把原因显示出来，顺序文件仍然可编辑。
+- 可拖拽并写回的是你自己配置的提供方（`llm-pi-ai` 家族）；宿主内置的 DeepSeek 卡片里这块显示为只读，
+  那份模型清单不在本机配置真源里，插件不碰。读侧挂住 10s 或报错时标题写「读取失败」，悬停看原因。
 - 不改宿主任何一行代码；但会按你的操作重排**当前生效真源**里对应提供方的 `models` 数组（0.1.5 线是 `~/.dsh/settings.yaml`，0.1.7 线起是 `~/.dsh/profiles/<p>/cordis.patch.yml`；写前都自动备份，见上）。卸载后 `model-order.json` 与代理配置留在 `~/.dsh` 下，手动删。
 - 靠改配置里 provider 的**键顺序**来排序不可靠：宿主的
   `registrationFacts` 会对 provider 做 sort 来判断"是否变化"，单纯调键序不触发
