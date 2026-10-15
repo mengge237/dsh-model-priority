@@ -67,7 +67,7 @@ async function mount(fetchImpl) {
   mod.apply({
     slots: {
       inject(nm, cb) { cb(); return () => {} },
-      register(spec, C) { if (spec.key === 'llm-pi-ai') Component = C; return () => {} },
+      register(spec, C) { if (spec.name === 'settings.models.provider-card') Component = C; return () => {} },
     },
   })
 

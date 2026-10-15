@@ -5,14 +5,26 @@
 
 ## 长什么样
 
-**设置 → 模型**页里，你自己配置的提供方卡片下面多一块「模型顺序」区（走上游槽位
-`settings.models.provider-card`，不用另开页面，也不需要装 dsh-better-sidebar；席位按适配器家族各注册一次，覆盖 `llm-pi-ai` 与内置 `llm-deepseek` 两个家族）。
-默认折叠，展开后是分组后的模型列表，按住行拖动排序：点「保存」写盘，
-点「恢复默认」回到宿主原顺序。
+两个入口（2026-10-15 第二轮定型）：
+
+- **侧边栏「模型排序」页**（需要 dsh-better-sidebar，本机在装）：下拉选提供方 → 分组模型列表拖拽，
+  覆盖 llm-pi-ai 家族的自定义提供方。默认模型带 ★ 固定不可拖。
+- **设置 → 模型 的 DeepSeek 卡片内扩展区**（走 keyed 槽 `settings.models.provider-card`，
+  key=llm-deepseek）：内置 DeepSeek 家族维持卡片内拖拽。
+- 为什么不让两个入口都在卡片上：`llm-pi-ai` 那张卡片格已被 web-all 0.4.6 的「模型能力」面板认领
+  （keyed 槽一格一主，上游契约如此）。0.3.0 曾把 pi-ai 入口挪到模型页底部 footer 区，
+  实测没人滚到那儿、等于没有，第二轮改侧边栏页 —— 不指望上游，动自己的代码。
+
+展开后是分组后的模型列表（百炼一个路由上百个模型，按 qwen/glm/kimi 家族分段各自折叠），
+按住行拖动即写盘（保存制），「恢复默认」回到宿主原顺序。
 
 ## 它怎么生效
 
-- 顺序存在 `~/.dsh/model-order.json`，纯数据，可以手改，删掉就回默认。
+- 排序来源 = **settings 真源里该提供方 `models` 数组的物理顺序**（`POST /settings-order` 文本块级重排）。
+  `~/.dsh/model-order.json` 是 0.1.x 时代的遗留文件（读钩子 09-10 已停用，仅剩状态展示兼容）。
+- **默认模型钉位**：`agent-default-model` 声明的那个模型写回时强制钉回原位，怎么拖都不动它。
+- **双端镜像**：写活动层的同时把同一顺序镜像到其它带 `llm-pi-ai` 的 profile 层（web↔desktop），
+  两边宿主各自 `patchReload: live` 盯自己的文件，一次拖动两端实时跟随；`config: { mirror: false }` 可关。
 - 服务端半边在 `ctx.llm` 的**实例属性**上包一层，让这三个方法按这份顺序返回：
   `listProviders()`、`listConfigurableProviders()`、`listModels(provider)`。
   排序是**稳定排序**：没被点过名的条目保持原来的相对位置，所以只调两个不会搅乱别的。
@@ -62,9 +74,10 @@ dsh plugin --profile web add "<本仓目录，或 git 地址>"
 dsh plugin --profile web remove dsh-model-priority
 ```
 
-面板挂在**上游**的 `settings.models.provider-card` 席位上（2026-09-10 改版时删掉了早期的
-侧边栏 tab），所以不需要装 dsh-better-sidebar：宿主有模型设置页就能用；
-拿不到 slots 服务时面板不挂载，那几条 HTTP 路由照常可用。
+面板挂在**上游**的 `settings.models.provider-card` 席位（仅 llm-deepseek 家族）与
+dsh-better-sidebar 的 `registerTab`（pi-ai 家族的「模型排序」页，2026-10-15 第二轮起）。
+拿不到 slots 时卡片格不挂；没装 better-sidebar 时侧边栏页 warn 跳过、卡片格照常——
+那几条 HTTP 路由任何情况下都可用。
 
 装完要**重启 dsh web**：服务端半边（注册路由、挂钩）与浏览器侧半边（进 boot 图的 combo）
 都是启动时装配的，只有重启才生效。顺序文件是每次调用现读的，改它不用重启。

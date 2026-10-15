@@ -172,3 +172,86 @@ test('老布局仍可写，且写前留 .bak', async () => {
   assert.ok(existsSync(I.SETTINGS_FILE + '.bak-' + res.backup.slice(res.backup.length - 24)) ||
             /settings\.yaml\.bak-/.test(res.backup), '要留备份')
 })
+
+/* ── 2026-10-15：默认模型钉位 + 双 profile 镜像 ─────────────────────────────── */
+
+test('默认模型钉回原位：qwen3.8-flash 声明为默认，即便点名要把它挪到最前也不动', async () => {
+  const rel = join('profiles', 'web', 'cordis.patch.yml')
+  const home = homeWith(rel, PROFILE_LAYER)
+  const I = await loadWith(home)
+
+  assert.deepEqual(I.pinDefaultInto(['a', 'b', 'c'], ['c', 'a', 'b'], 'b'), ['c', 'b', 'a'],
+    '纯函数：b 钉回下标 1，其余按点名顺序填坑')
+  assert.equal(I.parseDefaultModel(PROFILE_LAYER).model, 'qwen3.8-flash', '夹具里的默认模型解析得到')
+
+  const before = I.readProviderModelIds('tokenplan')
+  assert.deepEqual(before, ['glm-5.2', 'qwen3.8-flash'])
+  const res = I.reorderProviderModels('tokenplan', ['qwen3.8-flash', 'glm-5.2'])
+  assert.equal(res.ok, true, '写回应成功：' + res.error)
+  assert.deepEqual(I.readProviderModelIds('tokenplan'), before,
+    '默认模型原位不动，其它填坑后应与原序列一致（本次点名等于无效操作，但不许炸也不许挪默认）')
+})
+
+test('models 之后挂着同级键（retryPolicy）的提供方：交换顺序要成功，同级键原地不动', async () => {
+  const layer2 = PROFILE_LAYER.replace('    provider: tokenplan\n    model: qwen3.8-flash',
+                                       '    provider: bailian\n    model: qwen-max')
+  const rel = join('profiles', 'web', 'cordis.patch.yml')
+  const home = homeWith(rel, layer2)
+  const I = await loadWith(home)
+  const file = join(home, rel)
+
+  const res = I.reorderProviderModels('tokenplan', ['qwen3.8-flash', 'glm-5.2'])
+  assert.equal(res.ok, true, '带同级尾键的提供方也应可写：' + res.error)
+  assert.deepEqual(I.readProviderModelIds('tokenplan'), ['qwen3.8-flash', 'glm-5.2'])
+  const after = readFileSync(file, 'utf8')
+  assert.ok(after.indexOf('retryPolicy:') > after.indexOf('qwen3.8-flash'), 'retryPolicy 仍在 tokenplan 块内')
+  assert.ok(after.indexOf('retryPolicy:') < after.indexOf('- id: agent-default-model'), 'retryPolicy 不许被搬出提供方块')
+  assert.match(after, /maxRetries: 5/)
+  assert.equal(after.split('\n').length, layer2.split('\n').length, '总行数不变')
+})
+
+test('双 profile 镜像：web 是活动层时写 web，desktop 层同步换序；RT.mirror=false 时不动别层', async () => {
+  const webRel = join('profiles', 'web', 'cordis.patch.yml')
+  const deskRel = join('profiles', 'desktop', 'cordis.patch.yml')
+  const home = homeWith(webRel, PROFILE_LAYER)
+  const desk = join(home, deskRel)
+  mkdirSync(join(desk, '..'), { recursive: true })
+  writeFileSync(desk, PROFILE_LAYER, 'utf8')
+  const I = await loadWith(home)
+
+  const res = I.reorderProviderModels('bailian', ['qwen-max', 'kimi-k2.5'])
+  assert.equal(res.ok, true, res.error)
+  assert.ok(Array.isArray(res.layers), '镜像结果要逐层回报')
+  const deskRep = res.layers.find((l) => l.profile === 'desktop')
+  assert.ok(deskRep && deskRep.ok === true, 'desktop 层应镜像成功：' + JSON.stringify(deskRep))
+  assert.deepEqual(I.listProfileLayers().map((l) => l.name).sort(), ['desktop', 'web'], '两层都应被枚举到')
+  const deskText = readFileSync(desk, 'utf8')
+  assert.ok(deskText.indexOf('qwen-max') < deskText.indexOf('kimi-k2.5'), 'desktop 层文件里顺序也应已换')
+
+  I.RT.mirror = false
+  const res2 = I.reorderProviderModels('bailian', ['kimi-k2.5', 'qwen-max'])
+  assert.equal(res2.ok, true)
+  assert.equal(res2.layers, undefined, '关掉镜像后不该再有 layers')
+  const deskText2 = readFileSync(desk, 'utf8')
+  assert.ok(deskText2.indexOf('qwen-max') < deskText2.indexOf('kimi-k2.5'), '关镜像后 desktop 层保持上一次的结果，不再被写')
+})
+
+test('RT.profile=desktop 时活动层选 desktop，镜像回报里点名 web', async () => {
+  const webRel = join('profiles', 'web', 'cordis.patch.yml')
+  const deskRel = join('profiles', 'desktop', 'cordis.patch.yml')
+  const home = homeWith(webRel, PROFILE_LAYER)
+  const desk = join(home, deskRel)
+  mkdirSync(join(desk, '..'), { recursive: true })
+  writeFileSync(desk, PROFILE_LAYER, 'utf8')
+  const I = await loadWith(home)
+  I.RT.profile = 'desktop'
+
+  const layer = I.findProfileLayer()
+  assert.equal(layer.name, 'desktop', '活动层应是 desktop')
+  const res = I.reorderProviderModels('bailian', ['qwen-max', 'kimi-k2.5'])
+  assert.equal(res.ok, true, res.error)
+  const webRep = res.layers.find((l) => l.profile === 'web')
+  assert.ok(webRep && webRep.ok === true, 'web 层应被镜像：' + JSON.stringify(webRep))
+  const webText = readFileSync(join(home, webRel), 'utf8')
+  assert.ok(webText.indexOf('qwen-max') < webText.indexOf('kimi-k2.5'))
+})

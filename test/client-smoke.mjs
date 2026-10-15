@@ -65,29 +65,57 @@ ok('导出 apply 与 inject 两个符号', () => {
   assert.equal(typeof mod.apply, 'function')
   // vm 里造出来的数组属于另一个 realm，deepStrictEqual 会连原型一起比，
   // 所以先摊平回本 realm 再断言。
-  assert.deepEqual([...mod.inject], ['slots'])
+  assert.deepEqual([...mod.inject], ['slots', 'betterSidebar'])
 })
 
 const seats = []
-ok('apply 向上游 provider-card 席位注册卡片扩展（每个适配器家族一次）', () => {
+const tabs = []
+ok('apply 只向 provider-card 注册 llm-deepseek，pi-ai 入口挂侧边栏页（registerTab）', () => {
+  const injectNames = []
   const dispose = mod.apply({
     slots: {
-      inject(nm, cb) { assert.equal(nm, 'settings.models.provider-card'); cb(); return () => {} },
+      inject(nm, cb) { injectNames.push(nm); cb(); return () => {} },
       register(spec, Component) { seats.push({ spec, Component }); return () => {} },
+    },
+    betterSidebar: {
+      registerTab(spec) { tabs.push(spec); return () => {} },
     },
   })
   assert.equal(typeof dispose, 'function', 'apply 要返回 disposer')
-  assert.deepEqual(seats.map((s) => s.spec.key), ['llm-pi-ai', 'llm-deepseek'],
-    '要覆盖 pi-ai 家族与内置 DeepSeek 家族（否则 DeepSeek 卡片里不会有这块）')
-  for (const s of seats) {
-    assert.equal(s.spec.name, 'settings.models.provider-card')
-    assert.equal(typeof s.spec.inject, 'function')
-    assert.equal(typeof s.Component, 'function', '组件要能被宿主当普通函数调')
+  assert.deepEqual(injectNames, ['settings.models.provider-card'],
+    '2026-10-15 第二轮：footer 注入已撤（页底没人看），只剩 deepseek 卡片一次槽位注入')
+  const card = seats.filter((s) => s.spec.name === 'settings.models.provider-card')
+  assert.deepEqual(card.map((s) => s.spec.key), ['llm-deepseek'],
+    '卡片格不注册 llm-pi-ai（让给 web-all 的模型能力面板），只保留 DeepSeek 家族')
+  assert.equal(card.length, 1)
+  assert.equal(typeof card[0].spec.inject, 'function')
+  assert.equal(typeof card[0].Component, 'function', '组件要能被宿主当普通函数调')
+  assert.equal(tabs.length, 1, '侧边栏页要注册一次')
+  assert.equal(tabs[0].id, 'dsh-model-priority:order')
+  assert.equal(typeof tabs[0].component, 'function')
+  assert.equal(typeof tabs[0].title, 'function')
+  assert.ok(tabs[0].component({}) !== undefined, 'tab 组件要能产出元素（假 react 下只需非 undefined）')
+})
+
+ok('没有 betterSidebar 服务时：侧边栏页跳过并 warn，卡片格照常注册、不抛', () => {
+  const warnings = []
+  const origWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(' '))
+  try {
+    mod.apply({
+      slots: {
+        inject(nm, cb) { cb(); return () => {} },
+        register() { return () => {} },
+      },
+    })
+  } finally {
+    console.warn = origWarn
   }
+  assert.ok(warnings.some((w) => w.includes('betterSidebar')), '缺服务要有 warn')
 })
 
 ok('卡片组件对缺参不炸：没有 provider 时返回 null', () => {
-  const el = seats[0].Component({})
+  const el = seats.filter((s) => s.spec.name === 'settings.models.provider-card')[0].Component({})
   assert.equal(el, null, '拿不到 provider 行时应该渲染 null 而不是抛错')
 })
 
