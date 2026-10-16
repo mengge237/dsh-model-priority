@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-priority",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "自定义模型/提供方顺序：内置 DeepSeek 家族在卡片内拖拽，pi-ai 家族在侧边栏「模型排序」页（与 web-all 模型能力面板零竞争）；宿主的模型列表按这份顺序返回（物理重排 settings 真源，默认模型钉位，web/desktop 双端镜像，备份去重且只留最近 N 份）",
   "type": "module",
   "main": "lib/index.js",
