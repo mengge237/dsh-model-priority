@@ -1,5 +1,13 @@
 # 更新日志
 
+## 0.7.0 — 2026-10-22
+
+- 排序改成与上游工作区一致的 **insertBefore** 语义：客户端一次拖动只发 `POST /order/move {list, route, id, beforeId}`，服务端在列表适配器上执行 `insertBefore` 再写 settings；整份数组的 `/settings-order` 仍保留给预设排序。
+- 新增 `lib/lists.js` 列表适配器注册表：`registerList({ id, read, write })`，模型顺序是内置的第一条（`models`）；后续列表按同一接口接入，不动路由与前端。
+- 新增 `lib/order.js`（`insertBefore` + `OrderMoveInvalidError`）与 `test/order.test.mjs`；路由测试扩到 9 条。
+- 文案/描述只讲模型顺序；provider 列表与设置左导航排序不在契约内。
+
+
 ## 0.6.1 — 2026-10-22
 
 - **写入口收紧为契约单路径**：`POST /settings-order` 只走官方 `ctx.settings.describe()` + `mutate(ns, ops, revision)`；`ctx.settings` 缺席或 `llm-pi-ai` 命名空间不存在时回 **503**，不再回退到文本级重排（文本回退会绕开宿主的 revision 校验，且会自造备份/跨 profile 镜像）。
