@@ -1,5 +1,12 @@
 # 更新日志
 
+## 0.5.0 — 2026-10-22
+
+- 顺序默认改**读侧**：POST /settings-order 只写 ~/.dsh/model-order.json 并装 ctx.llm 钩子，**不再改写 settings 真源**（config: { writeBack: true } 才切回旧行为）。
+- 新增 GET/PUT /dsh-model-priority/ui-order.json 与 ~/.dsh/ui-order.json：原生列表顺序只存数据，浏览器侧按它重排 DOM；首批适配**设置左导航**（可拖拽，稳定 key = 标签文本），其它列表按同一描述符扩展。
+- 新增 	est/ui-order.test.mjs（8 项：稳定排序、清洗、落盘往返）。
+
+
 ## 0.4.1 — 2026-10-16
 
 - 读侧只读 route 时自动让位，不再与同格的模型能力面板抢 `settings.models.provider-card`。

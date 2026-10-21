@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-priority",
-  "version": "0.4.1",
-  "description": "自定义模型/提供方顺序：内置 DeepSeek 家族在卡片内拖拽，pi-ai 家族在侧边栏「模型排序」页（与 web-all 模型能力面板零竞争）；宿主的模型列表按这份顺序返回（物理重排 settings 真源，默认模型钉位，web/desktop 双端镜像，备份去重且只留最近 N 份）",
+  "version": "0.5.0",
+  "description": "DSH 模型/提供方顺序 + 原生列表排序：顺序只存本地（~/.dsh/model-order.json、~/.dsh/ui-order.json），运行时读侧生效，不改写 settings 配置；设置页与侧边栏可拖拽，首批原生列表是设置左导航；默认模型钉位，写前校验仅剩写回模式（config.writeBack=true）。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -26,7 +26,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs && node --test test/settings-source.test.mjs && node --test test/client-failure-state.test.mjs && node --test test/backup-policy.test.mjs"
+    "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs && node --test test/settings-source.test.mjs && node --test test/client-failure-state.test.mjs && node --test test/backup-policy.test.mjs && node test/ui-order.test.mjs"
   },
   "license": "MIT"
 }

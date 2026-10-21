@@ -70,7 +70,7 @@ ok('导出 apply 与 inject 两个符号', () => {
 
 const seats = []
 const tabs = []
-ok('apply 只向 provider-card 注册 llm-deepseek，pi-ai 入口挂侧边栏页（registerTab）', () => {
+ok('apply 向 provider-card 注册 llm-deepseek，pi-ai 入口挂模型页 footer（list 槽）', () => {
   const injectNames = []
   const dispose = mod.apply({
     slots: {
@@ -82,36 +82,36 @@ ok('apply 只向 provider-card 注册 llm-deepseek，pi-ai 入口挂侧边栏页
     },
   })
   assert.equal(typeof dispose, 'function', 'apply 要返回 disposer')
-  assert.deepEqual(injectNames, ['settings.models.provider-card'],
-    '2026-10-15 第二轮：footer 注入已撤（页底没人看），只剩 deepseek 卡片一次槽位注入')
+  assert.deepEqual(injectNames, ['settings.models.provider-card', 'settings.models.footer'],
+    '2026-10-16 第三轮：deepseek 卡片格 + 模型页 footer（list 槽，与 web-all 能力面板的辅助区并列）')
   const card = seats.filter((s) => s.spec.name === 'settings.models.provider-card')
   assert.deepEqual(card.map((s) => s.spec.key), ['llm-deepseek'],
     '卡片格不注册 llm-pi-ai（让给 web-all 的模型能力面板），只保留 DeepSeek 家族')
   assert.equal(card.length, 1)
   assert.equal(typeof card[0].spec.inject, 'function')
   assert.equal(typeof card[0].Component, 'function', '组件要能被宿主当普通函数调')
-  assert.equal(tabs.length, 1, '侧边栏页要注册一次')
-  assert.equal(tabs[0].id, 'dsh-model-priority:order')
-  assert.equal(typeof tabs[0].component, 'function')
-  assert.equal(typeof tabs[0].title, 'function')
-  assert.ok(tabs[0].component({}) !== undefined, 'tab 组件要能产出元素（假 react 下只需非 undefined）')
+  assert.equal(tabs.length, 0, '2026-10-16 第三轮：侧边栏入口已撤（本人明确不要这个功能）')
+  const footer = seats.filter((s) => s.spec.name === 'settings.models.footer')
+  assert.equal(footer.length, 1, '模型页 footer 只注册一次')
+  assert.equal(footer[0].spec.id, 'dsh-model-priority:order')
+  assert.equal(footer[0].spec.order, 40)
 })
 
-ok('没有 betterSidebar 服务时：侧边栏页跳过并 warn，卡片格照常注册、不抛', () => {
+ok('footer 槽注入失败时：只 warn，卡片格照常注册、不抛', () => {
   const warnings = []
   const origWarn = console.warn
   console.warn = (...args) => warnings.push(args.join(' '))
   try {
     mod.apply({
       slots: {
-        inject(nm, cb) { cb(); return () => {} },
+        inject(nm, cb) { if (nm === 'settings.models.footer') throw new Error('no footer slot'); cb(); return () => {} },
         register() { return () => {} },
       },
     })
   } finally {
     console.warn = origWarn
   }
-  assert.ok(warnings.some((w) => w.includes('betterSidebar')), '缺服务要有 warn')
+  assert.ok(warnings.some((w) => w.includes('settings.models.footer')), 'footer 注入失败要有 warn')
 })
 
 ok('卡片组件对缺参不炸：没有 provider 时返回 null', () => {

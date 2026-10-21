@@ -95,10 +95,11 @@ mod.apply(ctx)
 const STATE = '/dsh-model-priority/state.json'
 const ORDER = '/dsh-model-priority/order.json'
 
-await ok('apply 之后八条路由都注册上了（排序三条 + 代理三条 + 状态/顺序两条）', () => {
+await ok('apply 之后九条路由都注册上了（排序三条 + 原生列表一条 + 代理三条 + 状态/顺序两条）', () => {
   assert.ok(ctx.routes.has(STATE), STATE + ' 应该注册')
   assert.ok(ctx.routes.has(ORDER), ORDER + ' 应该注册')
-  for (const extra of ['/dsh-model-priority/provider-models',
+  for (const extra of ['/dsh-model-priority/ui-order.json',
+                       '/dsh-model-priority/provider-models',
                        '/dsh-model-priority/suggest',
                        '/dsh-model-priority/settings-order',
                        '/dsh-model-priority/rotate',
@@ -106,7 +107,7 @@ await ok('apply 之后八条路由都注册上了（排序三条 + 代理三条 
                        '/dsh-model-priority/proxy-enable']) {
     assert.ok(ctx.routes.has(extra), extra + ' 应该注册')
   }
-  assert.equal(ctx.routes.size, 8)
+  assert.equal(ctx.routes.size, 9)
 })
 
 await ok('路由形状：精确路由都是 exact；只有多密钥轮换代理用 prefix；都不带尾斜杠', () => {
@@ -119,6 +120,20 @@ await ok('路由形状：精确路由都是 exact；只有多密钥轮换代理�
     assert.ok(!route.path.endsWith('/'), route.path + ' 不该有尾斜杠')
     assert.equal(typeof route.handler, 'function')
   }
+})
+
+await ok('ui-order.json：GET 空 → PUT 写入 → GET 回读；坏 body 回 400', async () => {
+  const UI = '/dsh-model-priority/ui-order.json'
+  const g0 = await call(ctx.routes.get(UI))
+  assert.equal(g0.status, 200)
+  assert.deepEqual(g0.json.lists, {})
+  const put = await call(ctx.routes.get(UI), { method: 'PUT', body: { lists: { 'settings.nav': ['模型', '通用'] } } })
+  assert.equal(put.status, 200)
+  assert.deepEqual(put.json.lists, { 'settings.nav': ['模型', '通用'] })
+  const g1 = await call(ctx.routes.get(UI))
+  assert.deepEqual(g1.json.lists, { 'settings.nav': ['模型', '通用'] })
+  const bad = await call(ctx.routes.get(UI), { method: 'PUT', body: '{oops' })
+  assert.equal(bad.status, 400)
 })
 
 let first
@@ -226,7 +241,7 @@ await ok('没有 ctx.llm 时回 ok:true + hook.ok:false，而不是 500', async 
 await ok('ctx.effect 收到的 disposer 能把所有路由都摘掉', () => {
   const ctx4 = makeCtx(makeLlm())
   mod.apply(ctx4)
-  assert.equal(ctx4.routes.size, 8)
+  assert.equal(ctx4.routes.size, 9)
   // apply 自己不返回 disposer，摘除逻辑交给 ctx.effect(() => () => {...})，
   // 所以这里跑一遍收集到的 disposer，看路由是不是真的没了。
   assert.ok(ctx4.disposers.length >= 1, 'apply 应该往 ctx.effect 里注册过清理函数')
