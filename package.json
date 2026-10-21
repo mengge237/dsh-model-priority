@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-priority",
-  "version": "0.5.0",
-  "description": "DSH 模型/提供方顺序 + 原生列表排序：顺序只存本地（~/.dsh/model-order.json、~/.dsh/ui-order.json），运行时读侧生效，不改写 settings 配置；设置页与侧边栏可拖拽，首批原生列表是设置左导航；默认模型钉位，写前校验仅剩写回模式（config.writeBack=true）。",
+  "version": "0.6.0",
+  "description": "DSH 模型/提供方顺序：在设置页拖拽调整，保存走官方 settings 服务（describe + mutate + 版本校验），不重写配置文件、不挂钩 ctx.llm；顺序即 settings 真源里 models 数组的顺序，设置页与模型选择器同源。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -26,7 +26,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs && node --test test/settings-source.test.mjs && node --test test/client-failure-state.test.mjs && node --test test/backup-policy.test.mjs && node test/ui-order.test.mjs"
+    "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs && node --test test/settings-source.test.mjs && node --test test/client-failure-state.test.mjs && node --test test/backup-policy.test.mjs"
   },
   "license": "MIT"
 }

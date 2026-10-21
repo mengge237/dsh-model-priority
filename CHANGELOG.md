@@ -1,5 +1,12 @@
 # 更新日志
 
+## 0.6.0 — 2026-10-22
+
+- **按宿主契约重写写入路径**：排序保存改走官方 `ctx.settings.describe()` + `ctx.settings.mutate(ns, ops, revision)`，由宿主负责落盘与版本冲突（`SETTINGS_CONFLICT` → 提示刷新重试）。不再重写 `cordis.patch.yml` / `settings.yaml` 的文本块，也不再自建备份与跨 profile 镜像。
+- **去掉 0.5.0 的两条非契约做法**：不再替换 `ctx.llm` 实例方法（排序靠 settings 真源里 `models` 数组的顺序，pi-ai 适配器的 `listModels` 直接读它），也不再做「原生列表 DOM 重排 / ui-order.json」。设置左导航的排序不在宿主契约里（slot 只在注册时接受 `order`），本插件不提供，需上游加口。
+- 老宿主兼容：`ctx.settings` 缺席或命名空间不存在时，仍回退到原来的文本级重排路径。
+
+
 ## 0.5.0 — 2026-10-22
 
 - 顺序默认改**读侧**：POST /settings-order 只写 ~/.dsh/model-order.json 并装 ctx.llm 钩子，**不再改写 settings 真源**（config: { writeBack: true } 才切回旧行为）。

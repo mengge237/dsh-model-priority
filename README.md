@@ -3,11 +3,12 @@
 自定义模型 / 提供方的排列顺序。宿主的模型选择列表按适配器注册顺序排，常用的模型
 常常排在后面；这个插件让你在模型设置页里拖一下，把它顶到前面去。
 
-## 0.5.0：读侧顺序 + 原生列表排序（2026-10-22）
+## 0.6.0：按宿主契约重写写入路径（2026-10-22）
 
-- **不再改写配置真源**：拖拽只把顺序存进 `~/.dsh/model-order.json`，由 `ctx.llm` 的三个方法在运行时排序（`config: { writeBack: true }` 可切回旧行为）。没有备份文件、没有跨 profile 镜像，也不会和别的会话抢同一份配置。
-- **原生列表排序**：新增 `~/.dsh/ui-order.json` 与 `GET/PUT /dsh-model-priority/ui-order.json`。浏览器侧按这份数据重排 DOM，首批是**设置左导航**（拖拽条目即存，key = 标签文本）。设置页每次重渲染由 MutationObserver 补挂，不碰宿主源码。
-- **扩展方式**：`lib/client.js` 的 `UI_SORTERS` 加一条描述符（容器选择器 / 条目选择器 / 稳定 key）即可适配一类原生列表。
+- **不再重写配置文件**：保存走官方 `ctx.settings.describe()` + `ctx.settings.mutate(ns, ops, revision)`，宿主负责落盘与原子性；`SETTINGS_CONFLICT` 时提示刷新后重试（别处刚改过设置）。
+- **不再替换 `ctx.llm` 实例方法**：pi-ai 适配器的 `listModels` 直接读 settings 里 `providers.<route>.models` 的顺序，所以设置页、模型选择器、能力面板看到的是同一份顺序，不需要运行时挂钩。
+- **设置左导航排序不做**：宿主只允许在注册 slot 时给 `order`，没有运行时重排他人 section 的契约；本插件不碰 DOM，需要这类能力请去上游提需求。
+- 老宿主（没有 `ctx.settings`）回退到原来的文本级重排路径，保持可用。
 
 ## 长什么样
 

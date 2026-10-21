@@ -95,11 +95,10 @@ mod.apply(ctx)
 const STATE = '/dsh-model-priority/state.json'
 const ORDER = '/dsh-model-priority/order.json'
 
-await ok('apply 之后九条路由都注册上了（排序三条 + 原生列表一条 + 代理三条 + 状态/顺序两条）', () => {
+await ok('apply 之后八条路由都注册上了（排序三条 + 代理三条 + 状态/顺序两条）', () => {
   assert.ok(ctx.routes.has(STATE), STATE + ' 应该注册')
   assert.ok(ctx.routes.has(ORDER), ORDER + ' 应该注册')
-  for (const extra of ['/dsh-model-priority/ui-order.json',
-                       '/dsh-model-priority/provider-models',
+  for (const extra of ['/dsh-model-priority/provider-models',
                        '/dsh-model-priority/suggest',
                        '/dsh-model-priority/settings-order',
                        '/dsh-model-priority/rotate',
@@ -107,7 +106,7 @@ await ok('apply 之后九条路由都注册上了（排序三条 + 原生列表�
                        '/dsh-model-priority/proxy-enable']) {
     assert.ok(ctx.routes.has(extra), extra + ' 应该注册')
   }
-  assert.equal(ctx.routes.size, 9)
+  assert.equal(ctx.routes.size, 8)
 })
 
 await ok('路由形状：精确路由都是 exact；只有多密钥轮换代理用 prefix；都不带尾斜杠', () => {
@@ -122,18 +121,27 @@ await ok('路由形状：精确路由都是 exact；只有多密钥轮换代理�
   }
 })
 
-await ok('ui-order.json：GET 空 → PUT 写入 → GET 回读；坏 body 回 400', async () => {
-  const UI = '/dsh-model-priority/ui-order.json'
-  const g0 = await call(ctx.routes.get(UI))
-  assert.equal(g0.status, 200)
-  assert.deepEqual(g0.json.lists, {})
-  const put = await call(ctx.routes.get(UI), { method: 'PUT', body: { lists: { 'settings.nav': ['模型', '通用'] } } })
-  assert.equal(put.status, 200)
-  assert.deepEqual(put.json.lists, { 'settings.nav': ['模型', '通用'] })
-  const g1 = await call(ctx.routes.get(UI))
-  assert.deepEqual(g1.json.lists, { 'settings.nav': ['模型', '通用'] })
-  const bad = await call(ctx.routes.get(UI), { method: 'PUT', body: '{oops' })
-  assert.equal(bad.status, 400)
+await ok('reorderViaSettings：走官方 settings.mutate（带 revision），不改配置文件', async () => {
+  const calls = []
+  const settings = {
+    describe() {
+      return [{
+        ns: 'llm-pi-ai', revision: 5,
+        value: { providers: { p1: { models: [{ id: 'm2' }, { id: 'm1' }] } } },
+        user: { providers: { p1: { models: [{ id: 'm2' }, { id: 'm1' }] } } },
+      }]
+    },
+    async mutate(ns, ops, rev) { calls.push({ ns, ops, rev }) },
+  }
+  const ctx2 = { get: (name) => (name === 'settings' ? settings : undefined) }
+  const r = await mod.internals.reorderViaSettings(ctx2, 'p1', ['m1', 'm2'])
+  assert.equal(r.ok, true)
+  assert.equal(r.via, 'settings')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].ns, 'llm-pi-ai')
+  assert.equal(calls[0].rev, 5)
+  assert.deepEqual(calls[0].ops[0].path, ['providers', 'p1', 'models'])
+  assert.deepEqual(calls[0].ops[0].value.map((m) => m.id), ['m1', 'm2'])
 })
 
 let first
@@ -149,7 +157,7 @@ await ok('GET state.json：目录与顺序都报出来，没顺序时保持宿�
   assert.ok(first.json.orderFile.endsWith('model-order.json'))
 })
 
-await ok('PUT order.json：保存后立刻作用到 listProviders/listModels', async () => {
+await ok('PUT order.json：保存到文件与 state（0.6.0 起不再改宿主 llm，排序写回走 settings）', async () => {
   const r = await call(ctx.routes.get(ORDER), {
     method: 'PUT',
     body: { version: 1, providerOrder: ['p1'], modelOrder: { p1: ['m1', 'm2'] } },
@@ -158,10 +166,6 @@ await ok('PUT order.json：保存后立刻作用到 listProviders/listModels', a
   assert.equal(r.json.ok, true)
   assert.deepEqual(r.json.order.providerOrder, ['p1'])
 
-  assert.deepEqual(llm.listProviders().map((p) => p.id), ['p1', 'p2'])
-  assert.deepEqual((await llm.listModels('p1')).map((m) => m.id), ['m1', 'm2'])
-  // 没点名的提供方下面的模型顺序不受影响
-  assert.deepEqual((await llm.listModels('p2')).map((m) => m.id), ['x1'])
 })
 
 await ok('顺序文件真的落到磁盘了，且是清洗过的形状', () => {
@@ -171,16 +175,14 @@ await ok('顺序文件真的落到磁盘了，且是清洗过的形状', () => {
 
 await ok('GET state.json 此时报的是新顺序', async () => {
   const r = await call(ctx.routes.get(STATE))
-  assert.deepEqual(r.json.providers.map((p) => p.id), ['p1', 'p2'])
-  assert.deepEqual(r.json.models.p1.map((m) => m.id), ['m1', 'm2'])
+  assert.deepEqual(r.json.providers.map((p) => p.id), ['p2', 'p1'])
+  assert.deepEqual(r.json.order.providerOrder, ['p1'])
 })
 
 await ok('PUT { reset: true } 清空顺序，回到宿主原顺序', async () => {
   const r = await call(ctx.routes.get(ORDER), { method: 'PUT', body: { reset: true } })
   assert.equal(r.json.ok, true)
   assert.deepEqual(r.json.order.providerOrder, [])
-  assert.deepEqual(llm.listProviders().map((p) => p.id), ['p2', 'p1'])
-  assert.deepEqual((await llm.listModels('p1')).map((m) => m.id), ['m2', 'm1'])
 })
 
 await ok('GET order.json 单独也能读', async () => {
@@ -210,8 +212,6 @@ await ok('名字与顺序里的垃圾条目被清洗掉（空串、非字符串�
   })
   assert.deepEqual(r.json.order.providerOrder, ['p1', 'zzz'])
   assert.deepEqual(r.json.order.modelOrder.p1, ['m1'])
-  // 'zzz' 不在提供方列表里，不该凭空造出一个提供方
-  assert.deepEqual(llm.listProviders().map((p) => p.id), ['p1', 'p2'])
 })
 
 await ok('listProviders 抛错时不把整个 state 带崩，而是记一条 note', async () => {
@@ -227,21 +227,21 @@ await ok('listProviders 抛错时不把整个 state 带崩，而是记一条 not
   assert.ok(r.json.notes.some((n) => n.includes('适配器炸了')), '应该记下 listProviders 的错')
 })
 
-await ok('没有 ctx.llm 时回 ok:true + hook.ok:false，而不是 500', async () => {
+await ok('没有 ctx.llm 时回 ok:true + hook 标记 settings-service，而不是 500', async () => {
   const ctx3 = makeCtx(null)
   mod.apply(ctx3)
   const r = await call(ctx3.routes.get(STATE))
   assert.equal(r.status, 200)
   assert.equal(r.json.ok, true)
   assert.equal(r.json.llmAvailable, false)
-  assert.equal(r.json.hook.ok, false)
-  assert.ok(r.json.hook.reason.length > 0)
+  assert.equal(r.json.hook.ok, true)
+  assert.equal(r.json.hook.mode, 'settings-service')
 })
 
 await ok('ctx.effect 收到的 disposer 能把所有路由都摘掉', () => {
   const ctx4 = makeCtx(makeLlm())
   mod.apply(ctx4)
-  assert.equal(ctx4.routes.size, 9)
+  assert.equal(ctx4.routes.size, 8)
   // apply 自己不返回 disposer，摘除逻辑交给 ctx.effect(() => () => {...})，
   // 所以这里跑一遍收集到的 disposer，看路由是不是真的没了。
   assert.ok(ctx4.disposers.length >= 1, 'apply 应该往 ctx.effect 里注册过清理函数')
@@ -249,37 +249,6 @@ await ok('ctx.effect 收到的 disposer 能把所有路由都摘掉', () => {
     if (typeof d === 'function') d()
   }
   assert.equal(ctx4.routes.size, 0, '摘除后不该还留着路由')
-})
-
-await ok('listProviders 的替换是同步的（返回数组而不是 Promise）', () => {
-  // 这是最要命的一条：宿主的 buildModelCatalog 同步调 listProviders()，
-  // 一旦替换写成 async，它拿到 Promise，紧接着的 providers.map(...) 会抛
-  // "providers.map is not a function"，模型选择对话框直接打不开。
-  const got = llm.listProviders()
-  assert.ok(Array.isArray(got), 'listProviders() 必须同步返回数组，实际拿到 ' + Object.prototype.toString.call(got))
-  assert.equal(typeof got.then, 'undefined', '不能返回 thenable')
-})
-
-await ok('listConfigurableProviders 也按同一份顺序排（两个界面才一致）', async () => {
-  await call(ctx.routes.get(ORDER), { method: 'PUT', body: { providerOrder: ['p1', 'p2'] } })
-  const got = llm.listConfigurableProviders()
-  assert.ok(Array.isArray(got), 'listConfigurableProviders() 也必须同步返回数组')
-  assert.deepEqual(got.map((e) => e.provider), ['p1', 'p2'])
-  // 条目本身一个字段都不能动
-  assert.equal(got[0].displayName, '目录一')
-  assert.deepEqual(got[0].settingsPath, ['b'])
-  await call(ctx.routes.get(ORDER), { method: 'PUT', body: { reset: true } })
-})
-
-await ok('重复 apply 不会套第二层挂钩（幂等）', () => {
-  const llm5 = makeLlm()
-  const ctx5 = makeCtx(llm5)
-  mod.apply(ctx5)
-  const first = llm5.listProviders
-  const firstModels = llm5.listModels
-  mod.apply(ctx5)
-  assert.equal(llm5.listProviders, first, 'listProviders 不该被再包一层')
-  assert.equal(llm5.listModels, firstModels, 'listModels 不该被再包一层')
 })
 
 // ── 模型顺序：设置页排序能力的核心逻辑（2026-09-10 加）──────────────────────
