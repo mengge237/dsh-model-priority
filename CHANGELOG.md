@@ -1,5 +1,12 @@
 # 更新日志
 
+## 0.6.1 — 2026-10-22
+
+- **写入口收紧为契约单路径**：`POST /settings-order` 只走官方 `ctx.settings.describe()` + `mutate(ns, ops, revision)`；`ctx.settings` 缺席或 `llm-pi-ai` 命名空间不存在时回 **503**，不再回退到文本级重排（文本回退会绕开宿主的 revision 校验，且会自造备份/跨 profile 镜像）。
+- 删掉只验证文本重排引擎的 `settings-source.test.mjs`；`providerOrder` 仅为旧订单文件兼容保留，**不再生效**（插件只排「某提供方内部的模型顺序」，没有 provider 列表排序的官方口）。
+- 真机对照（探针 profile，真实 dsh 0.2.0-rc.2）：旧 0.4.2 → `settings-order` 自己写 `cordis.patch.yml` 并生成 `.bak-<ISO>`、还镜像到别的 profile；0.6.x → 返回 `via:"settings"`，文件由宿主 settings 服务改写，无 `.bak`，`state.json` 的 `models.demo` 顺序随之变成 `gamma,alpha,beta`。
+
+
 ## 0.6.0 — 2026-10-22
 
 - **按宿主契约重写写入路径**：排序保存改走官方 `ctx.settings.describe()` + `ctx.settings.mutate(ns, ops, revision)`，由宿主负责落盘与版本冲突（`SETTINGS_CONFLICT` → 提示刷新重试）。不再重写 `cordis.patch.yml` / `settings.yaml` 的文本块，也不再自建备份与跨 profile 镜像。
