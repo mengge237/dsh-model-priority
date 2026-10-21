@@ -65,7 +65,7 @@ ok('导出 apply 与 inject 两个符号', () => {
   assert.equal(typeof mod.apply, 'function')
   // vm 里造出来的数组属于另一个 realm，deepStrictEqual 会连原型一起比，
   // 所以先摊平回本 realm 再断言。
-  assert.deepEqual([...mod.inject], ['slots', 'betterSidebar'])
+  assert.deepEqual([...mod.inject], ['slots'])
 })
 
 const seats = []
