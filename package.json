@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-priority",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "DSH 模型顺序 + 原生设置列表排序。模型顺序写在 settings（insertBefore move）；设置左导航是可拖拽的持久顺序（~/.dsh/ui-order.json），入口是原生 settings.section。",
   "type": "module",
   "main": "lib/index.js",

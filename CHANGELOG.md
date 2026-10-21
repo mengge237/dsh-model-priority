@@ -1,5 +1,10 @@
 # 更新日志
 
+## 0.8.3 — 2026-10-22
+
+- 左导航拖动改成工作区那种反馈：悬停时按行上半/下半显示**蓝色插入线**（与宿主同款：两段斜角端点 + 2px `--dsw-alias-state-business-primary` 横线），落点只认行前/行后两个位置，松手才真正插入；原来是指针一过就把元素直接挪走。
+
+
 ## 0.8.2 — 2026-10-22
 
 - 设置分区改成**兼容入口**：先用 `slots.entriesOfSlot('settings.models.provider-card')` 看 `llm-pi-ai` 那格是否已被别的插件（如 web-all 的模型能力面板）占住；空闲就直接挂 provider-card 卡片格（与 DeepSeek 卡片同款），被占才退回原生设置分区。
