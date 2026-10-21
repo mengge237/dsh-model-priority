@@ -70,44 +70,55 @@ ok('导出 apply 与 inject 两个符号', () => {
 
 const seats = []
 const tabs = []
-ok('apply 向 provider-card 注册 llm-deepseek，pi-ai 入口挂原生设置分区（settings.section）', () => {
+
+function makeSlots(injectNames, options) {
+  const opts = options || {}
+  return {
+    entriesOfSlot() { return opts.occupied ? [{ options: { key: 'llm-pi-ai' } }] : [] },
+    inject(nm, cb) {
+      injectNames.push(nm)
+      if (opts.throwOn === nm) throw new Error('no slot: ' + nm)
+      cb()
+      return () => {}
+    },
+    register(spec, Component) { seats.push({ spec, Component }); return () => {} },
+  }
+}
+
+ok('pi-ai 卡片格已被占用：DeepSeek 卡片 + 原生设置分区（兼容入口）', () => {
   const injectNames = []
-  const dispose = mod.apply({
-    slots: {
-      inject(nm, cb) { injectNames.push(nm); cb(); return () => {} },
-      register(spec, Component) { seats.push({ spec, Component }); return () => {} },
-    },
-    betterSidebar: {
-      registerTab(spec) { tabs.push(spec); return () => {} },
-    },
-  })
+  const dispose = mod.apply({ slots: makeSlots(injectNames, { occupied: true }) })
   assert.equal(typeof dispose, 'function', 'apply 要返回 disposer')
   assert.deepEqual(injectNames, ['settings.models.provider-card', 'settings.section'],
-    'deepseek 卡片格 + 原生设置分区（左导航一行，与其它分区同样式）')
-  const card = seats.filter((s) => s.spec.name === 'settings.models.provider-card')
-  assert.deepEqual(card.map((s) => s.spec.key), ['llm-deepseek'],
-    '卡片格不注册 llm-pi-ai（让给 web-all 的模型能力面板），只保留 DeepSeek 家族')
-  assert.equal(card.length, 1)
-  assert.equal(typeof card[0].spec.inject, 'function')
-  assert.equal(typeof card[0].Component, 'function', '组件要能被宿主当普通函数调')
-  assert.equal(tabs.length, 0, '2026-10-16 第三轮：侧边栏入口已撤（本人明确不要这个功能）')
+    'DeepSeek 卡片格 + 兼容用设置分区')
+  const cards = seats.filter((s) => s.spec.name === 'settings.models.provider-card')
+  assert.deepEqual(cards.map((s) => s.spec.key), ['llm-deepseek'],
+    '不抢已被占用的 llm-pi-ai 卡片格')
   const section = seats.filter((s) => s.spec.name === 'settings.section')
   assert.equal(section.length, 1, '设置分区只注册一次')
   assert.equal(section[0].spec.id, 'model-priority')
   assert.equal(section[0].spec.order, 55)
+  assert.equal(tabs.length, 0, '侧边栏入口已撤')
 })
 
-ok('settings.section 注入失败时：只 warn，卡片格照常注册、不抛', () => {
+ok('pi-ai 卡片格空闲：直接挂卡片格，不新增设置分区', () => {
+  seats.length = 0
+  const injectNames = []
+  mod.apply({ slots: makeSlots(injectNames, { occupied: false }) })
+  assert.deepEqual(injectNames, ['settings.models.provider-card', 'settings.models.provider-card'])
+  const cards = seats.filter((s) => s.spec.name === 'settings.models.provider-card')
+  assert.deepEqual(cards.map((s) => s.spec.key), ['llm-deepseek', 'llm-pi-ai'])
+  assert.equal(seats.filter((s) => s.spec.name === 'settings.section').length, 0, '空闲时不加设置分区')
+})
+
+ok('兼容分区注入失败时：只 warn，不抛', () => {
+  seats.length = 0
   const warnings = []
   const origWarn = console.warn
   console.warn = (...args) => warnings.push(args.join(' '))
   try {
-    mod.apply({
-      slots: {
-        inject(nm, cb) { if (nm === 'settings.section') throw new Error('no section slot'); cb(); return () => {} },
-        register() { return () => {} },
-      },
-    })
+    const injectNames = []
+    mod.apply({ slots: makeSlots(injectNames, { occupied: true, throwOn: 'settings.section' }) })
   } finally {
     console.warn = origWarn
   }
