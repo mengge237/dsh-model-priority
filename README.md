@@ -1,28 +1,19 @@
 # dsh-model-priority
 
-模型顺序（不是提供方排序）。按 settings 里 `providers.<route>.models` 的顺序排列，
-设置页与模型选择器读同一份数据。
+模型顺序 + 原生列表排序。
+
+- **模型顺序**：设置页「模型顺序」分区里拖动某个提供方内部的模型；写入走官方 settings（`describe` + `mutate` + revision），一次拖动 = 一个 `insertBefore` move。
+- **设置左导航**：设置里的左侧列表可直接拖拽排序，顺序存 `~/.dsh/ui-order.json`，刷新后保持。
 
 ## 契约
 
-- 写入只走官方 settings 服务：`describe()` 取 revision → `mutate('llm-pi-ai', [{op:'set', path:['providers', route, 'models'], value}], revision)`。
-- 没有 `ctx.settings` 或 `llm-pi-ai` 命名空间时返回 503，不写任何文件。
-- 一次拖动 = 一个 `insertBefore` move（`POST /dsh-model-priority/order/move {list, route, id, beforeId}`），与上游工作区排序同形。
+- 模型顺序只改 settings 里 `providers.<route>.models` 的顺序；没有 `ctx.settings` 时返回 503，不写文件。
+- 左导航顺序是纯展示数据，走插件自己的 `GET/PUT /dsh-model-priority/ui-order.json`，不碰宿主配置。
+- 设置分区用原生 `settings.section`（id `model-priority`，order 55），样式由宿主给。
 
 ## 扩展
 
-`lib/lists.js` 是列表适配器注册表：
-
-```js
-registerList({ id: 'models', read(ctx, params), write(ctx, params, ids) })
-```
-
-新增一类可排序列表 = 注册一个适配器；路由与前端拖动复用同一套 move。
-
-## 不做
-
-- 设置左导航排序、provider 列表排序：宿主没有运行时排序契约（slot 只在注册时收 `order`）。
-- `model-order.json` 里的 `providerOrder` 仅为旧文件兼容保留，不生效。
+`lib/lists.js`：`registerList({ id, read, write })`。新增可排序列表 = 注册适配器，move 路由与前端拖动复用。
 
 ## 测试
 

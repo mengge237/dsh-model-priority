@@ -95,7 +95,7 @@ mod.apply(ctx)
 const STATE = '/dsh-model-priority/state.json'
 const ORDER = '/dsh-model-priority/order.json'
 
-await ok('apply 之后九条路由都注册上了（排序三条 + move 一条 + 代理三条 + 状态/顺序两条）', () => {
+await ok('apply 之后十条路由都注册上了（排序三条 + move 一条 + 原生列表顺序一条 + 代理三条 + 状态/顺序两条）', () => {
   assert.ok(ctx.routes.has(STATE), STATE + ' 应该注册')
   assert.ok(ctx.routes.has(ORDER), ORDER + ' 应该注册')
   for (const extra of ['/dsh-model-priority/order/move',
@@ -107,7 +107,7 @@ await ok('apply 之后九条路由都注册上了（排序三条 + move 一条 +
                        '/dsh-model-priority/proxy-enable']) {
     assert.ok(ctx.routes.has(extra), extra + ' 应该注册')
   }
-  assert.equal(ctx.routes.size, 9)
+  assert.equal(ctx.routes.size, 10)
 })
 
 await ok('路由形状：精确路由都是 exact；只有多密钥轮换代理用 prefix；都不带尾斜杠', () => {
@@ -242,7 +242,7 @@ await ok('没有 ctx.llm 时回 ok:true + hook 标记 settings-service，而不�
 await ok('ctx.effect 收到的 disposer 能把所有路由都摘掉', () => {
   const ctx4 = makeCtx(makeLlm())
   mod.apply(ctx4)
-  assert.equal(ctx4.routes.size, 9)
+  assert.equal(ctx4.routes.size, 10)
   // apply 自己不返回 disposer，摘除逻辑交给 ctx.effect(() => () => {...})，
   // 所以这里跑一遍收集到的 disposer，看路由是不是真的没了。
   assert.ok(ctx4.disposers.length >= 1, 'apply 应该往 ctx.effect 里注册过清理函数')

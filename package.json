@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-priority",
-  "version": "0.7.2",
-  "description": "DSH 模型顺序：在模型设置页拖动调整某个提供方内部的模型顺序。写入走官方 settings 服务（describe + mutate + revision），与上游工作区的 insertBefore 同形：一次拖动 = 一个 move（id + beforeId）。列表适配器可注册，后续列表按同一接口接入。",
+  "version": "0.8.0",
+  "description": "DSH 模型顺序 + 原生设置列表排序。模型顺序写在 settings（insertBefore move）；设置左导航是可拖拽的持久顺序（~/.dsh/ui-order.json），入口是原生 settings.section。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
