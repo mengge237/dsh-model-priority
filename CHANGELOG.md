@@ -1,5 +1,12 @@
 # 更新日志
 
+## 0.7.1 — 2026-10-22
+
+- 样式对齐宿主（不再自造一套看得见的外壳）：文字用 `--dsw-alias-label-primary/secondary`，分隔线用 `--dsw-alias-border-l2*`，悬停用 `--dsw-alias-interactive-bg-hover`；去掉外框、圆角块和加粗标题，动作按钮改成行内文字按钮。
+- 侧栏/页底的提供方选择器**去掉原生 `<select>`**（它的选项浮层在深色主题下与文字同色、看不清），改成一行提供方小按钮，当前项用淡底提示。
+- 拖动行改为宿主设置页那种「细线分隔 + 轻悬停」，去掉彩色边框和浮起的容器。
+
+
 ## 0.7.0 — 2026-10-22
 
 - 排序改成与上游工作区一致的 **insertBefore** 语义：客户端一次拖动只发 `POST /order/move {list, route, id, beforeId}`，服务端在列表适配器上执行 `insertBefore` 再写 settings；整份数组的 `/settings-order` 仍保留给预设排序。
