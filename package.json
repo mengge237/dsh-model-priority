@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-priority",
   "version": "0.8.3",
-  "description": "DSH 模型顺序 + 原生设置列表排序。模型顺序写在 settings（insertBefore move）；设置左导航是可拖拽的持久顺序（~/.dsh/ui-order.json），入口是原生 settings.section。",
+  "description": "DSH model order + native settings-list order. Model order lives in settings (insertBefore move); the settings left nav keeps a drag order in ~/.dsh/ui-order.json.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -28,5 +28,23 @@
   "scripts": {
     "test": "node test/selftest.mjs && node test/server-routes.mjs && node test/client-smoke.mjs && node --test test/client-failure-state.test.mjs && node --test test/backup-policy.test.mjs && node test/order.test.mjs"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mengge237/dsh-model-priority.git"
+  },
+  "homepage": "https://github.com/mengge237/dsh-model-priority#readme",
+  "bugs": {
+    "url": "https://github.com/mengge237/dsh-model-priority/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "model-order",
+    "settings"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
 }

@@ -6,6 +6,14 @@
 - **入口是兼容的**：`settings.models.provider-card` 的 `llm-pi-ai` 格空闲时直接挂卡片格（和 DeepSeek 卡片同一位置、同款样式）；被别的插件（如 web-all「模型能力」）占住时才退回原生设置分区「模型顺序」。
 - **设置左导航**：可拖拽排序，顺序存 `~/.dsh/ui-order.json`（`GET/PUT /dsh-model-priority/ui-order.json`），刷新后保持。
 
+## 安装
+
+```sh
+dsh plugin --profile web add github:mengge237/dsh-model-priority
+```
+
+本地开发用 `dsh plugin --profile web add link:/path/to/dsh-model-priority`，装完重启一次 `dsh web`。
+
 ## 契约
 
 - 模型顺序只改 settings 里 `providers.<route>.models` 的顺序；没有 `ctx.settings` 时返回 503，不写文件。
